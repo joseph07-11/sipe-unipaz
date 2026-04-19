@@ -1,0 +1,137 @@
+{% extends 'base.html' %}
+{% block title %}Postulaciones — Coordinador SIPE{% endblock %}
+
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h3 class="fw-bold mb-0">
+        <i class="bi bi-send-fill text-primary me-2"></i>Todas las Postulaciones
+    </h3>
+    <a href="{{ url_for('coordinador.dashboard') }}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left me-1"></i>Dashboard
+    </a>
+</div>
+
+<!-- Filtro por estado -->
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body py-2">
+        <form method="GET" class="d-flex gap-2 align-items-center">
+            <label class="fw-semibold small text-muted me-2">Filtrar por estado:</label>
+            {% for estado, label, color in [
+                ('', 'Todas', 'secondary'),
+                ('postulado', 'Postulado', 'primary'),
+                ('en_proceso', 'En Proceso', 'warning'),
+                ('aceptado', 'Aceptado', 'success'),
+                ('rechazado', 'Rechazado', 'danger')
+            ] %}
+            <a href="?estado={{ estado }}"
+               class="btn btn-{{ color }} btn-sm {% if filtro_estado == estado %}active{% endif %}">
+                {{ label }}
+            </a>
+            {% endfor %}
+        </form>
+    </div>
+</div>
+
+<!-- Tabla de postulaciones -->
+{% if postulaciones %}
+<div class="card border-0 shadow-sm">
+    <div class="table-responsive">
+        <table class="table table-hover mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Estudiante</th>
+                    <th>Programa</th>
+                    <th>Vacante</th>
+                    <th>Empresa</th>
+                    <th>Estado</th>
+                    <th>Fecha</th>
+                    <th>Acción</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in postulaciones %}
+                <tr>
+                    <td>
+                        <div class="fw-semibold">{{ p.usuarios.nombre }} {{ p.usuarios.apellido }}</div>
+                        <div class="text-muted small">{{ p.usuarios.email }}</div>
+                    </td>
+                    <td class="small text-muted">{{ p.usuarios.programa or '—' }}</td>
+                    <td class="fw-semibold small">{{ p.vacantes.titulo[:40] }}</td>
+                    <td class="small">{{ p.vacantes.empresa[:25] }}</td>
+                    <td>
+                        <span class="badge
+                            {% if p.estado == 'aceptado' %}bg-success
+                            {% elif p.estado == 'rechazado' %}bg-danger
+                            {% elif p.estado == 'en_proceso' %}bg-warning text-dark
+                            {% else %}bg-primary{% endif %}">
+                            {{ p.estado|replace('_',' ')|capitalize }}
+                        </span>
+                    </td>
+                    <td class="text-muted small">{{ p.creado_en[:10] }}</td>
+                    <td>
+                        <!-- Modal para cambiar estado -->
+                        <button class="btn btn-outline-primary btn-sm"
+                                data-bs-toggle="modal"
+                                data-bs-target="#modal-{{ p.id }}">
+                            <i class="bi bi-pencil"></i>
+                        </button>
+
+                        <!-- Modal -->
+                        <div class="modal fade" id="modal-{{ p.id }}" tabindex="-1">
+                            <div class="modal-dialog">
+                                <div class="modal-content">
+                                    <div class="modal-header">
+                                        <h5 class="modal-title">Actualizar Postulación</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                    </div>
+                                    <form method="POST"
+                                          action="{{ url_for('coordinador.cambiar_estado', postulacion_id=p.id) }}">
+                                        <div class="modal-body">
+                                            <p class="text-muted small mb-3">
+                                                <strong>{{ p.usuarios.nombre }}</strong> →
+                                                {{ p.vacantes.titulo[:50] }}
+                                            </p>
+                                            <div class="mb-3">
+                                                <label class="form-label fw-semibold">Nuevo Estado</label>
+                                                <select name="estado" class="form-select">
+                                                    <option value="postulado"  {% if p.estado == 'postulado'  %}selected{% endif %}>Postulado</option>
+                                                    <option value="en_proceso" {% if p.estado == 'en_proceso' %}selected{% endif %}>En Proceso</option>
+                                                    <option value="aceptado"   {% if p.estado == 'aceptado'   %}selected{% endif %}>Aceptado ✅</option>
+                                                    <option value="rechazado"  {% if p.estado == 'rechazado'  %}selected{% endif %}>Rechazado ❌</option>
+                                                </select>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label class="form-label fw-semibold">Nota (opcional)</label>
+                                                <textarea name="nota" class="form-control" rows="3"
+                                                          placeholder="Comentario para el estudiante...">{{ p.nota or '' }}</textarea>
+                                            </div>
+                                        </div>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                                                Cancelar
+                                            </button>
+                                            <button type="submit" class="btn btn-primary">
+                                                <i class="bi bi-check-circle me-1"></i>Guardar
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% else %}
+<div class="text-center py-5">
+    <i class="bi bi-inbox text-muted" style="font-size:4rem"></i>
+    <h5 class="text-muted mt-3">No hay postulaciones con este filtro</h5>
+</div>
+{% endif %}
+
+{% endblock %}

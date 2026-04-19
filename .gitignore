@@ -1,0 +1,23 @@
+# Entorno virtual
+venv/
+
+# Variables secretas — NUNCA subir
+.env
+
+# Caché de Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Archivos temporales del scraper
+debug_computrabajo.html
+diagnostico_html.py
+test_extraccion.py
+
+# IDEs
+.vscode/
+.idea/
+
+# Sistema
+.DS_Store
+Thumbs.db

@@ -1,0 +1,96 @@
+{% extends 'base.html' %}
+{% block title %}Nueva Vacante — Coordinador SIPE{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h3 class="fw-bold mb-0">
+                <i class="bi bi-plus-circle-fill text-success me-2"></i>Agregar Vacante Manual
+            </h3>
+            <a href="{{ url_for('coordinador.dashboard') }}" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-arrow-left me-1"></i>Dashboard
+            </a>
+        </div>
+
+        <div class="card border-0 shadow-sm">
+            <div class="card-body p-4">
+                <form method="POST">
+
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">Título del Cargo *</label>
+                            <input type="text" name="titulo" class="form-control"
+                                   placeholder="Ej: Desarrollador Python Junior" required>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Empresa *</label>
+                            <input type="text" name="empresa" class="form-control"
+                                   placeholder="Ej: TechCorp Colombia" required>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Salario</label>
+                            <input type="text" name="salario" class="form-control"
+                                   placeholder="Ej: 2.000.000 - 2.500.000">
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Ubicación</label>
+                            <input type="text" name="ubicacion" class="form-control"
+                                   placeholder="Ej: Barrancabermeja, Santander">
+                        </div>
+
+                        <div class="col-md-3">
+                            <label class="form-label fw-semibold">Modalidad</label>
+                            <select name="modalidad" class="form-select">
+                                <option value="presencial">Presencial</option>
+                                <option value="remoto">Remoto</option>
+                                <option value="hibrido">Híbrido</option>
+                            </select>
+                        </div>
+
+                        <div class="col-md-3">
+                            <label class="form-label fw-semibold">Fecha Límite</label>
+                            <input type="date" name="fecha_limite" class="form-control">
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">Descripción del Cargo</label>
+                            <textarea name="descripcion" class="form-control" rows="4"
+                                      placeholder="Describe las responsabilidades del cargo..."></textarea>
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">Requisitos</label>
+                            <textarea name="requisitos" class="form-control" rows="4"
+                                      placeholder="Formación, experiencia, habilidades requeridas..."></textarea>
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">Link de Aplicación</label>
+                            <input type="url" name="link_aplicacion" class="form-control"
+                                   placeholder="https://...">
+                        </div>
+
+                        <div class="col-12 mt-2">
+                            <div class="d-flex gap-3">
+                                <button type="submit" class="btn btn-success btn-lg">
+                                    <i class="bi bi-check-circle me-2"></i>Guardar Vacante
+                                </button>
+                                <a href="{{ url_for('coordinador.dashboard') }}"
+                                   class="btn btn-outline-secondary btn-lg">
+                                    Cancelar
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

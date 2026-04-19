@@ -1,0 +1,52 @@
+{% extends 'base.html' %}
+{% block title %}Iniciar Sesión — SIPE{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-5">
+        <div class="card shadow-sm border-0 mt-4">
+            <div class="card-body p-4">
+
+                <div class="text-center mb-4">
+                    <i class="bi bi-briefcase-fill text-primary" style="font-size: 2.5rem;"></i>
+                    <h4 class="fw-bold mt-2">SIPE Unipaz</h4>
+                    <p class="text-muted">Inicia sesión para ver las vacantes</p>
+                </div>
+
+                <form method="POST" action="{{ url_for('auth.login') }}">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">
+                            <i class="bi bi-envelope me-1"></i>Correo electrónico
+                        </label>
+                        <input type="email" name="email" class="form-control"
+                               placeholder="tu@correo.com" required autofocus>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">
+                            <i class="bi bi-lock me-1"></i>Contraseña
+                        </label>
+                        <input type="password" name="password" class="form-control"
+                               placeholder="••••••••" required>
+                    </div>
+
+                    <div class="d-grid mt-4">
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="bi bi-box-arrow-in-right me-2"></i>Iniciar Sesión
+                        </button>
+                    </div>
+                </form>
+
+                <hr class="my-4">
+                <p class="text-center text-muted mb-0">
+                    ¿No tienes cuenta?
+                    <a href="{{ url_for('auth.registro') }}" class="text-primary fw-semibold">
+                        Regístrate aquí
+                    </a>
+                </p>
+
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

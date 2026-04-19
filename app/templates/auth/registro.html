@@ -1,0 +1,96 @@
+{% extends 'base.html' %}
+{% block title %}Registro — SIPE{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-7">
+        <div class="card shadow-sm border-0 mt-4">
+            <div class="card-body p-4">
+
+                <div class="text-center mb-4">
+                    <i class="bi bi-person-plus-fill text-primary" style="font-size: 2.5rem;"></i>
+                    <h4 class="fw-bold mt-2">Crear Cuenta</h4>
+                    <p class="text-muted">Regístrate como estudiante Unipaz</p>
+                </div>
+
+                <form method="POST" action="{{ url_for('auth.registro') }}">
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-semibold">Nombre *</label>
+                            <input type="text" name="nombre" class="form-control"
+                                   placeholder="Ej: Juan" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-semibold">Apellido *</label>
+                            <input type="text" name="apellido" class="form-control"
+                                   placeholder="Ej: Pérez" required>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-semibold">Correo electrónico *</label>
+                            <input type="text" name="nombre" class="form-control"
+                                   placeholder="Ej: Juan" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-semibold">Semestre</label>
+                            <select name="programa" class="form-select">
+                                <option value="">Selecciona...</option>
+                                <option>PRIMERO</option>
+                                <option>SEGUNDO</option>
+                                <option>TERCERO</option>
+                                <option>CUARTO</option>
+                                <option>QUINTO</option>
+                                <option>SEXTO</option>
+                                <option>SEPTIMO</option>
+                                <option>OCTAVO</option>
+                                <option>NOVENO</option>
+                                <option>DECIMO</option>
+                            </select>
+                        </div>
+
+                    <div class="col-md-6 mb-3">
+                            <label class="form-label fw-semibold">Programa académico</label>
+                            <select name="programa" class="form-select">
+                                <option value="">Selecciona...</option>
+                                <option>Ingeniería Informática</option>
+                                <option>Ingeniería Ambiental y de Saneamiento</option>
+                                <option>Ingeniería Agroindustrial</option>
+                                <option>Ingeniería Agropecuaria</option>
+                                <option>Ingeniería Electromecánica</option>
+                                <option>Licenciatura en Artes</option>
+                                <option>Medicina Veterinaria y Zootecnia</option>
+                                <option>Profesional en Turismo</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-semibold">
+                                <i class="bi bi-lock me-1"></i>Contraseña *
+                            </label>
+                            <input type="password" name="password" class="form-control"
+                                   placeholder="Mínimo 6 caracteres" required minlength="6">
+                        </div>
+                    </div>
+
+                    <div class="d-grid mt-3">
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="bi bi-person-check me-2"></i>Crear Cuenta
+                        </button>
+                    </div>
+                </form>
+
+                <hr class="my-4">
+                <p class="text-center text-muted mb-0">
+                    ¿Ya tienes cuenta?
+                    <a href="{{ url_for('auth.login') }}" class="text-primary fw-semibold">
+                        Inicia sesión
+                    </a>
+                </p>
+
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

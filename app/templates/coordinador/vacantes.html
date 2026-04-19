@@ -1,0 +1,93 @@
+{% extends 'base.html' %}
+{% block title %}Gestionar Vacantes — Coordinador SIPE{% endblock %}
+
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h3 class="fw-bold mb-0">
+        <i class="bi bi-briefcase-fill text-primary me-2"></i>Gestionar Vacantes
+    </h3>
+    <div class="d-flex gap-2">
+        <a href="{{ url_for('coordinador.nueva_vacante') }}" class="btn btn-success btn-sm">
+            <i class="bi bi-plus-circle me-1"></i>Nueva
+        </a>
+        <a href="{{ url_for('coordinador.dashboard') }}" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-left me-1"></i>Dashboard
+        </a>
+    </div>
+</div>
+
+<!-- Filtro activas/inactivas -->
+<div class="mb-3 d-flex gap-2">
+    <a href="?mostrar=activas"
+       class="btn btn-sm {% if mostrar == 'activas' %}btn-primary{% else %}btn-outline-primary{% endif %}">
+        ✅ Activas
+    </a>
+    <a href="?mostrar=inactivas"
+       class="btn btn-sm {% if mostrar == 'inactivas' %}btn-danger{% else %}btn-outline-danger{% endif %}">
+        ❌ Inactivas
+    </a>
+    <a href="?mostrar=todas"
+       class="btn btn-sm {% if mostrar == 'todas' %}btn-secondary{% else %}btn-outline-secondary{% endif %}">
+        📋 Todas
+    </a>
+</div>
+
+{% if vacantes %}
+<div class="card border-0 shadow-sm">
+    <div class="table-responsive">
+        <table class="table table-hover mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Cargo</th>
+                    <th>Empresa</th>
+                    <th>Fuente</th>
+                    <th>Modalidad</th>
+                    <th>Estado</th>
+                    <th>Fecha</th>
+                    <th>Acción</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for v in vacantes %}
+                <tr>
+                    <td class="fw-semibold">{{ v.titulo[:45] }}</td>
+                    <td>{{ v.empresa[:30] }}</td>
+                    <td><span class="badge bg-secondary">{{ v.fuente|capitalize }}</span></td>
+                    <td><span class="badge bg-light text-dark border">{{ v.modalidad|capitalize }}</span></td>
+                    <td>
+                        {% if v.activa %}
+                            <span class="badge bg-success">Activa</span>
+                        {% else %}
+                            <span class="badge bg-danger">Inactiva</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-muted small">{{ v.creado_en[:10] }}</td>
+                    <td class="d-flex gap-1">
+                        <a href="{{ url_for('vacantes.detalle', vacante_id=v.id) }}"
+                           class="btn btn-outline-primary btn-sm">
+                            <i class="bi bi-eye"></i>
+                        </a>
+                        <form method="POST"
+                              action="{{ url_for('coordinador.toggle_vacante', vacante_id=v.id) }}">
+                            <button type="submit"
+                                    class="btn btn-sm {% if v.activa %}btn-outline-danger{% else %}btn-outline-success{% endif %}"
+                                    onclick="return confirm('¿Confirmas esta acción?')">
+                                <i class="bi bi-{% if v.activa %}eye-slash{% else %}eye{% endif %}"></i>
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% else %}
+<div class="text-center py-5">
+    <i class="bi bi-inbox text-muted" style="font-size:4rem"></i>
+    <h5 class="text-muted mt-3">No hay vacantes en esta categoría</h5>
+</div>
+{% endif %}
+
+{% endblock %}

@@ -1,0 +1,197 @@
+{% extends 'base.html' %}
+{% block title %}Dashboard Coordinador — SIPE{% endblock %}
+
+{% block content %}
+
+<!-- Encabezado -->
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h3 class="fw-bold mb-0">
+            <i class="bi bi-speedometer2 text-primary me-2"></i>Panel del Coordinador
+        </h3>
+        <small class="text-muted">Bienvenido, {{ session.nombre }} {{ session.apellido }}</small>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="{{ url_for('coordinador.nueva_vacante') }}" class="btn btn-success btn-sm">
+            <i class="bi bi-plus-circle me-1"></i>Nueva Vacante
+        </a>
+        <a href="{{ url_for('coordinador.ejecutar_scraper') }}" class="btn btn-warning btn-sm">
+            <i class="bi bi-robot me-1"></i>Ejecutar Scraper
+        </a>
+    </div>
+</div>
+
+<!-- Tarjetas de estadísticas -->
+<div class="row g-4 mb-4">
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm text-center p-3">
+            <i class="bi bi-briefcase-fill text-primary mb-2" style="font-size:2.5rem"></i>
+            <h2 class="fw-bold">{{ stats.total_vacantes or 0 }}</h2>
+            <p class="text-muted mb-0">Vacantes Activas</p>
+            <a href="{{ url_for('coordinador.gestionar_vacantes') }}"
+               class="btn btn-outline-primary btn-sm mt-2">Ver todas</a>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm text-center p-3">
+            <i class="bi bi-people-fill text-success mb-2" style="font-size:2.5rem"></i>
+            <h2 class="fw-bold">{{ stats.total_estudiantes or 0 }}</h2>
+            <p class="text-muted mb-0">Estudiantes Registrados</p>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm text-center p-3">
+            <i class="bi bi-send-fill text-warning mb-2" style="font-size:2.5rem"></i>
+            <h2 class="fw-bold">{{ stats.total_postulaciones or 0 }}</h2>
+            <p class="text-muted mb-0">Postulaciones Totales</p>
+            <a href="{{ url_for('coordinador.postulaciones') }}"
+               class="btn btn-outline-warning btn-sm mt-2">Ver todas</a>
+        </div>
+    </div>
+</div>
+
+<!-- Fuentes y postulaciones recientes -->
+<div class="row g-4 mb-4">
+
+    <!-- Vacantes por fuente -->
+    <div class="col-md-6">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <h6 class="fw-bold mb-3">
+                    <i class="bi bi-pie-chart me-2 text-primary"></i>Vacantes por Fuente
+                </h6>
+
+                {% set total = stats.total_vacantes if stats.total_vacantes else 1 %}
+
+                {% for fuente, cantidad in stats.fuentes.items() %}
+                    {% set pct = (cantidad * 100 // total) %}
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <span class="badge bg-secondary" style="min-width:100px">
+                            {{ fuente|capitalize }}
+                        </span>
+                        <div class="flex-grow-1 mx-3">
+                            <div class="progress" style="height:8px">
+                                <div class="progress-bar bg-primary"
+                                     role="progressbar"
+                                     aria-valuenow="{{ pct }}"
+                                     aria-valuemin="0"
+                                     aria-valuemax="100"
+                                     data-width="{{ pct }}">
+                                </div>
+                            </div>
+                        </div>
+                        <span class="fw-bold">{{ cantidad }}</span>
+                    </div>
+                {% endfor %}
+
+            </div>
+        </div>
+    </div>
+
+    <!-- Últimas postulaciones -->
+    <div class="col-md-6">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <h6 class="fw-bold mb-3">
+                    <i class="bi bi-clock-history me-2 text-warning"></i>Últimas Postulaciones
+                </h6>
+
+                {% if postulaciones_recientes %}
+                    {% for p in postulaciones_recientes %}
+                    <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom">
+                        <div>
+                            <div class="fw-semibold small">
+                                {{ p.usuarios.nombre }} {{ p.usuarios.apellido }}
+                            </div>
+                            <div class="text-muted" style="font-size:0.75rem">
+                                {{ p.vacantes.titulo[:40] }}
+                            </div>
+                        </div>
+                        <span class="badge
+                            {% if p.estado == 'aceptado' %}bg-success
+                            {% elif p.estado == 'rechazado' %}bg-danger
+                            {% elif p.estado == 'en_proceso' %}bg-warning text-dark
+                            {% else %}bg-primary{% endif %}">
+                            {{ p.estado|replace('_',' ')|capitalize }}
+                        </span>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="text-center py-4">
+                        <i class="bi bi-inbox text-muted" style="font-size:2rem"></i>
+                        <p class="text-muted mt-2 mb-0">Sin postulaciones aún</p>
+                    </div>
+                {% endif %}
+
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- Últimas vacantes agregadas -->
+<div class="card border-0 shadow-sm">
+    <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h6 class="fw-bold mb-0">
+                <i class="bi bi-clock me-2 text-success"></i>Últimas Vacantes Agregadas
+            </h6>
+            <a href="{{ url_for('coordinador.gestionar_vacantes') }}"
+               class="btn btn-outline-secondary btn-sm">Ver todas</a>
+        </div>
+
+        {% if vacantes_recientes %}
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Cargo</th>
+                        <th>Empresa</th>
+                        <th>Fuente</th>
+                        <th>Fecha</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for v in vacantes_recientes %}
+                    <tr>
+                        <td class="fw-semibold">{{ v.titulo[:45] }}</td>
+                        <td>{{ v.empresa[:30] }}</td>
+                        <td>
+                            <span class="badge bg-secondary">{{ v.fuente|capitalize }}</span>
+                        </td>
+                        <td class="text-muted small">{{ v.creado_en[:10] }}</td>
+                        <td>
+                            <a href="{{ url_for('vacantes.detalle', vacante_id=v.id) }}"
+                               class="btn btn-outline-primary btn-sm">
+                                <i class="bi bi-eye"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-4">
+            <i class="bi bi-inbox text-muted" style="font-size:2rem"></i>
+            <p class="text-muted mt-2 mb-0">No hay vacantes aún</p>
+        </div>
+        {% endif %}
+
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Animar las barras de progreso al cargar la página
+    // Leemos el ancho desde data-width para evitar Jinja2 en style
+    document.addEventListener('DOMContentLoaded', function () {
+        document.querySelectorAll('.progress-bar[data-width]').forEach(function (bar) {
+            bar.style.width = bar.getAttribute('data-width') + '%';
+        });
+    });
+</script>
+{% endblock %}

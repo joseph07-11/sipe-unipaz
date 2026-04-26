@@ -9,6 +9,21 @@ from app.auth_utils import login_required
 from app.config import CARRERAS_KEYWORDS
 
 vacantes_bp = Blueprint('vacantes', __name__)
+# Agregar en vacantes.py, antes de las otras rutas
+
+from flask import Blueprint, render_template, request, redirect, url_for, flash, session, jsonify
+from app.extensions import get_supabase
+from app.auth_utils import login_required
+
+vacantes_bp = Blueprint('vacantes', __name__)
+
+# ── RUTA RAÍZ — Redirige al login o a vacantes ────────────────
+@vacantes_bp.route('/')
+def home():
+    """Ruta principal — redirige según si hay sesión activa."""
+    if 'usuario_id' in session:
+        return redirect(url_for('vacantes.index'))
+    return redirect(url_for('auth.login'))
 
 
 # ── CARTELERA PRINCIPAL ───────────────────────────────────────

@@ -62,4 +62,16 @@ def create_app(config_name='default'):
     from app.routes.api import api_bp
     app.register_blueprint(api_bp, url_prefix='/api')
 
+    # Agregar esto ANTES del return app en create_app()
+
+# ── Ruta raíz ────────────────────────────────────────────────
+from flask import redirect, url_for, session
+
+@app.route('/')
+def home():
+    """Redirige al login o a vacantes según si hay sesión."""
+    if 'usuario_id' in session:
+        return redirect(url_for('vacantes.index'))
+    return redirect(url_for('auth.login'))
+
     return app

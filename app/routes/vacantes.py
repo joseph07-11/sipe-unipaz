@@ -9,68 +9,6 @@ from app.auth_utils import login_required
 from app.config import CARRERAS_KEYWORDS
 
 vacantes_bp = Blueprint('vacantes', __name__)
-# app/routes/vacantes.py
-# ============================================================
-# Agrega esto AL INICIO del archivo, después de los imports
-# ============================================================
-
-# ── Carreras de Unipaz con sus palabras clave ─────────────────
-# Cada carrera tiene keywords que identifican vacantes relevantes
-# El scraper trae de todo; esto filtra lo pertinente por programa
-CARRERAS_KEYWORDS = {
-
-    'Administración de Negocios Internacionales': [
-        'administración', 'administrativo', 'gerencia', 'gestión',
-        'ventas', 'comercial', 'marketing', 'recursos humanos',
-        'contratación', 'presupuesto', 'planificación', 'director',
-        'coordinador', 'supervisor', 'asesor comercial', 'comercio exterior',
-        'importaciones', 'exportaciones', 'aduanas', 'logística'
-    ],
-    'Ingeniería Informática': [
-        'sistemas', 'software', 'programador', 'desarrollador',
-        'python', 'java', 'javascript', 'web', 'base de datos',
-        'sql', 'redes', 'soporte', 'tecnología', 'it ', 'ti ',
-        'ciberseguridad', 'cloud', 'devops', 'frontend', 'backend',
-        'fullstack', 'análisis de datos', 'machine learning'
-    ],
-    'Ingeniería Ambiental y de Saneamiento': [
-        'ambiental', 'saneamiento', 'hseq', 'residuos', 'impacto ambiental',
-        'tratamiento de aguas', 'ecología', 'biodiversidad', 'suelos',
-        'recursos naturales', 'consultoría ambiental', 'gestión ambiental'
-    ],
-    'Ingeniería Agroindustrial': [
-        'agroindustrial', 'alimentos', 'procesos', 'poscosecha',
-        'control de calidad', 'transformación', 'empaques', 'conservación',
-        'plantas de producción', 'lácteos', 'cárnicos', 'agroindustria'
-    ],
-    'Ingeniería Agropecuaria': [
-        'agropecuario', 'finca', 'cultivos', 'siembra', 'cosecha',
-        'asistente técnico', 'agronomía', 'campo', 'producción animal',
-        'insumos agrícolas', 'riego', 'sector agro'
-    ],
-    'Ingeniería Electromecánica': [
-        'electromecánico', 'mantenimiento', 'mecánica', 'electricidad',
-        'instrumentación', 'montajes', 'equipos industriales', 'motores',
-        'soldadura', 'planos', 'automatización', 'electrotecnia'
-    ],
-    'Licenciatura en Artes': [
-        'artes', 'cultural', 'diseño', 'música', 'danza', 'teatro',
-        'pintura', 'docente', 'pedagogía', 'creatividad', 'curaduría',
-        'gestor cultural', 'exposición', 'artística'
-    ],
-    'Medicina Veterinaria y Zootecnia': [
-        'veterinaria', 'veterinario', 'zootecnista', 'clínica animal',
-        'pequeños animales', 'grandes animales', 'cirugía veterinaria',
-        'bienestar animal', 'sanidad', 'nutrición animal', 'salud animal'
-    ],
-    'Profesional en Turismo': [
-        'turismo', 'hotelería', 'recepción', 'guía', 'viajes',
-        'agencia', 'turístico', 'eventos', 'hospitalidad', 'cruceros',
-        'servicios turísticos', 'guianza'
-    ]
-}
-
-
 
 
 # ── CARTELERA PRINCIPAL ───────────────────────────────────────
@@ -127,9 +65,11 @@ def index():
 
             for v in vacantes:
                 titulo      = (v.get('titulo')      or '').lower()
+                empresa     = (v.get('empresa')     or '').lower()
                 descripcion = (v.get('descripcion') or '').lower()
                 requisitos  = (v.get('requisitos')  or '').lower()
-                texto       = f"{titulo} {descripcion} {requisitos}"
+                ubicacion   = (v.get('ubicacion')   or '').lower()
+                texto       = f"{titulo} {empresa} {descripcion} {requisitos} {ubicacion}"
 
                 if any(kw in texto for kw in keywords):
                     vacantes_filtradas.append(v)

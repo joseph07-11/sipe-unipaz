@@ -1,4 +1,4 @@
-# ejecutar_scraper.py — Versión 3.0
+# ejecutar_scraper.py — REGLA DE ORO: Experiencia Cero
 import os, sys
 from pathlib import Path
 from dotenv import load_dotenv
@@ -8,62 +8,45 @@ load_dotenv(dotenv_path=BASE_DIR / '.env')
 sys.path.insert(0, str(BASE_DIR))
 
 from supabase import create_client
-from app.scrapers.computrabajo import ComputrabajoScraper
+from app.scrapers.computrabajo import ComputrabajoScraper, TERMINOS_BUSQUEDA
 
 def main():
-    print("=" * 60)
-    print("  🤖 SIPE — Motor de Scraping v3.0")
-    print("  🛡️  Selectores verificados con HTML real")
-    print("=" * 60)
+    print("=" * 65)
+    print("  🤖 SIPE — Motor de Scraping")
+    print("  🎯 REGLA DE ORO: Solo vacantes con Experiencia CERO")
+    print("  🏫 Filtrado por carreras Unipaz")
+    print(f"  🔍 Total términos a buscar: {len(TERMINOS_BUSQUEDA)}")
+    print("=" * 65)
 
     sb = create_client(
         os.environ.get('SUPABASE_URL'),
-        os.environ.get('SUPABASE_KEY')
+        os.environ.get('SUPABASE_SERVICE_KEY')
     )
     print("✅ Conectado a Supabase\n")
 
-    TERMINOS = [
-        'Programador',
-        'Veterinario',
-        'Zootecnista',
-        'Agronomía',
-        'Proyectista Civil',
-    ]
-
     scraper = ComputrabajoScraper(
         supabase_client=sb,
-        delay_min=4,
-        delay_max=8
+        delay_min=5,
+        delay_max=10
     )
 
-    print("Elige modo de ejecución:")
-    print("  1 → Solo lista (rápido, sin descripción)")
-    print("  2 → Lista + detalles (lento, descripción completa)")
-    modo = input("Opción (1/2): ").strip()
+    resumen = scraper.ejecutar(
+        terminos_busqueda=TERMINOS_BUSQUEDA,
+        max_paginas=3
+    )
 
-    if modo == '2':
-        print("\n⚠️  Modo enriquecido: visitará el detalle de cada vacante.")
-        print("    Esto es más lento pero obtiene descripción y requisitos.\n")
-        resumen = scraper.ejecutar_con_detalles(
-            terminos_busqueda=TERMINOS,
-            max_paginas=2,
-            max_detalles=15  # Máximo 15 páginas de detalle
-        )
-    else:
-        resumen = scraper.ejecutar(
-            terminos_busqueda=TERMINOS,
-            max_paginas=2
-        )
-
-    print("\n" + "=" * 60)
+    print("\n" + "=" * 65)
     print("  📊 RESUMEN FINAL")
-    print("=" * 60)
-    print(f"  Encontradas: {resumen['vacantes_encontradas']}")
-    print(f"  ✅ Guardadas:  {resumen['vacantes_guardadas']} nuevas")
-    print(f"  ⏭️  Duplicadas: {resumen['vacantes_encontradas'] - resumen['vacantes_guardadas']}")
-    print(f"  ❌ Errores:    {resumen['errores']}")
-    print(f"  ⏱️  Duración:   {resumen['duracion_segundos']}s")
-    print("=" * 60)
+    print("=" * 65)
+    print(f"  🔍 Encontradas en HTML:   {resumen['vacantes_encontradas']}")
+    print(f"  🚫 Rechazadas por filtro: {resumen['vacantes_rechazadas']}")
+    print(f"  ✅ Guardadas en BD:       {resumen['vacantes_guardadas']}")
+    print(f"  ❌ Errores:               {resumen['errores']}")
+    print(f"  ⏱️  Duración:              {resumen['duracion_segundos']}s")
+    print("=" * 65)
+    if resumen['vacantes_rechazadas'] > 0:
+        pct = resumen['vacantes_rechazadas'] / max(resumen['vacantes_encontradas'], 1) * 100
+        print(f"\n💡 Eficiencia del filtro: {pct:.0f}% de basura eliminada")
 
 if __name__ == '__main__':
-    main()
+    main()

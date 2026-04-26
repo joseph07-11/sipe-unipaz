@@ -3,6 +3,7 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 from flask import Flask
+from flask_cors import CORS
 from supabase import create_client
 import app.extensions as extensions
 
@@ -24,12 +25,27 @@ def create_app(config_name='default'):
     # Configuración de Flask
     app.secret_key = os.environ.get('SECRET_KEY', 'clave-temporal')
     app.config['DEBUG'] = True
+    app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+    app.config['SESSION_COOKIE_HTTPONLY'] = True
+
+    # Habilitar CORS para el frontend React
+    CORS(app, supports_credentials=True, origins=[
+        'http://localhost:5173',
+        'http://127.0.0.1:5173',
+    ])
 
     if not supabase_url or not supabase_key:
         raise ValueError("❌ SUPABASE_URL o SUPABASE_KEY no encontradas")
-
-    # Crear cliente Supabase
+    # Cliente normal (anon) — para lectura en el frontend
     extensions.supabase_client = create_client(supabase_url, supabase_key)
+
+    # Cliente de servicio — para escritura del scraper
+    supabase_service_key = os.environ.get('SUPABASE_SERVICE_KEY')
+    if supabase_service_key:
+        extensions.supabase_service_client = create_client(supabase_url, supabase_service_key)
+    else:
+        extensions.supabase_service_client = extensions.supabase_client
+
     print("✅ Conexión con Supabase establecida correctamente.")
 
     # Registrar Blueprints
@@ -41,5 +57,9 @@ def create_app(config_name='default'):
 
     from app.routes.coordinador import coordinador_bp
     app.register_blueprint(coordinador_bp, url_prefix='/coordinador')
+
+    # API REST para el frontend React
+    from app.routes.api import api_bp
+    app.register_blueprint(api_bp, url_prefix='/api')
 
     return app

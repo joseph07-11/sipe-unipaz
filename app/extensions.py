@@ -12,3 +12,9 @@ supabase_client: Client = None
 def get_supabase() -> Client:
     """Retorna el cliente Supabase inicializado."""
     return supabase_client
+
+supabase_service_client: Client = None
+
+def get_supabase_service() -> Client:
+    """Cliente con permisos completos — solo para escrituras del scraper."""
+    return supabase_service_client

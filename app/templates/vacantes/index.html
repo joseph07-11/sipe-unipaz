@@ -40,14 +40,86 @@
                     <label class="form-label fw-semibold small text-muted">
                         <i class="bi bi-mortarboard me-1"></i>MI CARRERA
                     </label>
-                    <select name="carrera" class="form-select">
+                    <select name="carrera" class="form-select" id="filtro-carrera">
                         <option value="">Todas las carreras</option>
-                        {% for c in carreras %}
-                        <option value="{{ c }}"
-                            {% if filtro_carrera == c %}selected{% endif %}>
-                            {{ c }}
-                        </option>
-                        {% endfor %}
+
+                        <optgroup label="── Ciencias">
+                            <option value="Administración de Negocios Internacionales"
+                                {% if filtro_carrera == 'Administración de Negocios Internacionales' %}selected{% endif %}>
+                                Administración de Negocios Internacionales</option>
+                            <option value="Ingeniería Informática"
+                                {% if filtro_carrera == 'Ingeniería Informática' %}selected{% endif %}>
+                                Ingeniería Informática</option>
+                            <option value="Licenciatura en Artes"
+                                {% if filtro_carrera == 'Licenciatura en Artes' %}selected{% endif %}>
+                                Licenciatura en Artes</option>
+                            <option value="Química"
+                                {% if filtro_carrera == 'Química' %}selected{% endif %}>
+                                Química</option>
+                        </optgroup>
+
+                        <optgroup label="── Ciencias Sociales">
+                            <option value="Comunicación Social"
+                                {% if filtro_carrera == 'Comunicación Social' %}selected{% endif %}>
+                                Comunicación Social</option>
+                            <option value="Derecho"
+                                {% if filtro_carrera == 'Derecho' %}selected{% endif %}>
+                                Derecho</option>
+                            <option value="Trabajo Social"
+                                {% if filtro_carrera == 'Trabajo Social' %}selected{% endif %}>
+                                Trabajo Social</option>
+                        </optgroup>
+
+                        <optgroup label="── Ingeniería Agroindustrial">
+                            <option value="Ingeniería Agroindustrial"
+                                {% if filtro_carrera == 'Ingeniería Agroindustrial' %}selected{% endif %}>
+                                Ingeniería Agroindustrial</option>
+                            <option value="Tecnología en Procesamiento de Alimentos"
+                                {% if filtro_carrera == 'Tecnología en Procesamiento de Alimentos' %}selected{% endif %}>
+                                Tecnología en Procesamiento de Alimentos</option>
+                            <option value="Profesional en Turismo"
+                                {% if filtro_carrera == 'Profesional en Turismo' %}selected{% endif %}>
+                                Profesional en Turismo</option>
+                        </optgroup>
+
+                        <optgroup label="── Ingeniería Agronómica">
+                            <option value="Ingeniería Agronómica"
+                                {% if filtro_carrera == 'Ingeniería Agronómica' %}selected{% endif %}>
+                                Ingeniería Agronómica</option>
+                        </optgroup>
+
+                        <optgroup label="── Ingeniería Ambiental">
+                            <option value="Ingeniería Ambiental y de Saneamiento"
+                                {% if filtro_carrera == 'Ingeniería Ambiental y de Saneamiento' %}selected{% endif %}>
+                                Ingeniería Ambiental y de Saneamiento</option>
+                            <option value="Ingeniería Civil"
+                                {% if filtro_carrera == 'Ingeniería Civil' %}selected{% endif %}>
+                                Ingeniería Civil</option>
+                            <option value="Tecnología en Obras Civiles"
+                                {% if filtro_carrera == 'Tecnología en Obras Civiles' %}selected{% endif %}>
+                                Tecnología en Obras Civiles</option>
+                        </optgroup>
+
+                        <optgroup label="── Ingeniería de Producción">
+                            <option value="Ingeniería de Producción"
+                                {% if filtro_carrera == 'Ingeniería de Producción' %}selected{% endif %}>
+                                Ingeniería de Producción</option>
+                            <option value="Ingeniería en Seguridad y Salud en el Trabajo"
+                                {% if filtro_carrera == 'Ingeniería en Seguridad y Salud en el Trabajo' %}selected{% endif %}>
+                                Ing. Seguridad y Salud en el Trabajo</option>
+                            <option value="Tecnología en Seguridad y Salud en el Trabajo"
+                                {% if filtro_carrera == 'Tecnología en Seguridad y Salud en el Trabajo' %}selected{% endif %}>
+                                Tecnología SST</option>
+                            <option value="Tecnología en Operación de Sistemas Electromécanicos"
+                                {% if filtro_carrera == 'Tecnología en Operación de Sistemas Electromécanicos' %}selected{% endif %}>
+                                Tecnología en Sistemas Electromécanicos</option>
+                        </optgroup>
+
+                        <optgroup label="── Medicina Veterinaria">
+                            <option value="Medicina Veterinaria y Zootecnia"
+                                {% if filtro_carrera == 'Medicina Veterinaria y Zootecnia' %}selected{% endif %}>
+                                Medicina Veterinaria y Zootecnia</option>
+                        </optgroup>
                     </select>
                 </div>
 

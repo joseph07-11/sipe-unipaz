@@ -4,7 +4,7 @@
 # ============================================================
 
 from flask import Blueprint, render_template, redirect, url_for, flash, request, session
-from app.extensions import get_supabase
+from app.extensions import get_supabase, get_supabase_service
 from app.auth_utils import coordinador_required
 
 coordinador_bp = Blueprint('coordinador', __name__)
@@ -108,27 +108,49 @@ def postulaciones():
 @coordinador_bp.route('/ejecutar-scraper', methods=['GET', 'POST'])
 @coordinador_required
 def ejecutar_scraper():
-    """Ejecuta el scraper de vacantes."""
     if request.method == 'POST':
         try:
             from app.scrapers.computrabajo import ComputrabajoScraper
 
-            sb = get_supabase()
+            # Reusar el cliente de servicio ya inicializado al arrancar la app
+            # (bypasea RLS igual que el script de terminal)
+            sb_service = get_supabase_service()
+
+            if sb_service is None:
+                flash('❌ SUPABASE_SERVICE_KEY no está configurada en el .env', 'danger')
+                return redirect(url_for('coordinador.ejecutar_scraper'))
+
+            terminos = [
+                'pasantia ingenieria',
+                'practicante sistemas',
+                'aprendiz sena',
+                'practicante administrativo',
+                'trainee colombia',
+                'practicante ambiental',
+                'auxiliar juridico sin experiencia',
+                'desarrollador junior sin experiencia',
+            ]
+
             scraper = ComputrabajoScraper(
-                supabase_client=sb,
-                delay_min=3,
-                delay_max=5
+                supabase_client=sb_service,
+                delay_min=4,
+                delay_max=8
             )
+
             resumen = scraper.ejecutar(
-                terminos_busqueda=['ingeniero sistemas', 'desarrollador python', 'soporte tecnico'],
+                terminos_busqueda=terminos,
                 max_paginas=2
             )
+
             flash(
-                f"✅ Scraper completado: {resumen['vacantes_guardadas']} vacantes nuevas guardadas.",
+                f"🤖 Scraper completado: {resumen['vacantes_guardadas']} vacantes nuevas "
+                f"guardadas de {resumen['vacantes_encontradas']} encontradas. "
+                f"({resumen['vacantes_rechazadas']} rechazadas por filtros)",
                 'success'
             )
+
         except Exception as e:
-            flash(f'❌ Error en el scraper: {str(e)}', 'danger')
+            flash(f'❌ Error ejecutando scraper: {str(e)}', 'danger')
 
         return redirect(url_for('coordinador.dashboard'))
 

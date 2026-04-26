@@ -1,169 +1,201 @@
 # app/routes/coordinador.py
 # ============================================================
-# RUTAS DEL PANEL DE COORDINADOR — SIPE
+# RUTAS DEL COORDINADOR — API JSON pura
+# Endpoints bajo prefijo /api/coordinador/
+# Todos protegidos por rol 'coordinador'
 # ============================================================
 
-from flask import Blueprint, render_template, redirect, url_for, flash, request, session
+from flask import Blueprint, request, jsonify, session
 from app.extensions import get_supabase, get_supabase_service
-from app.auth_utils import coordinador_required
+from functools import wraps
 
-coordinador_bp = Blueprint('coordinador', __name__)
+coordinador_bp = Blueprint('coordinador_api', __name__)
 
 
-# ── DASHBOARD PRINCIPAL ───────────────────────────────────────
-@coordinador_bp.route('/dashboard')
-@coordinador_required
+# ── Decorador para rutas de coordinador ──────────────────────
+def coordinador_required_json(f):
+    """
+    Protege rutas exclusivas del coordinador.
+    Retorna JSON 401 o 403 según el caso.
+    """
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if 'usuario_id' not in session:
+            return jsonify({'error': 'No autenticado', 'autenticado': False}), 401
+        if session.get('rol') != 'coordinador':
+            return jsonify({'error': 'Acceso denegado. Se requiere rol coordinador'}), 403
+        return f(*args, **kwargs)
+    return decorated
+
+
+# ── DASHBOARD ────────────────────────────────────────────────
+@coordinador_bp.route('/dashboard', methods=['GET'])
+@coordinador_required_json
 def dashboard():
-    """Panel principal del coordinador con estadísticas generales."""
+    """
+    GET /api/coordinador/dashboard
+    Retorna estadísticas generales de SIPE.
+    """
     try:
         sb = get_supabase()
 
-        # Total vacantes activas
-        vacantes_activas = sb.table('vacantes').select('id', count='exact').eq('activa', True).execute()
-        total_vacantes = vacantes_activas.count or 0
+        # Conteos principales
+        r_vacantes     = sb.table('vacantes').select('id', count='exact').eq('activa', True).execute()
+        r_estudiantes  = sb.table('usuarios').select('id', count='exact').eq('rol', 'estudiante').execute()
+        r_postulaciones = sb.table('postulaciones').select('id', count='exact').execute()
 
-        # Total estudiantes registrados
-        estudiantes_resp = sb.table('usuarios').select('id', count='exact').eq('rol', 'estudiante').execute()
-        total_estudiantes = estudiantes_resp.count or 0
-
-        # Total postulaciones
-        postulaciones_resp = sb.table('postulaciones').select('id', count='exact').execute()
-        total_postulaciones = postulaciones_resp.count or 0
-
-        # Vacantes por fuente (para la barra de progreso)
-        todas_vacantes_resp = sb.table('vacantes').select('fuente').eq('activa', True).execute()
-        fuentes = {}
-        for v in (todas_vacantes_resp.data or []):
-            f = v.get('fuente', 'desconocida') or 'desconocida'
+        # Vacantes por fuente
+        r_fuentes = sb.table('vacantes').select('fuente').eq('activa', True).execute()
+        fuentes   = {}
+        for v in (r_fuentes.data or []):
+            f = v.get('fuente') or 'desconocida'
             fuentes[f] = fuentes.get(f, 0) + 1
 
-        # Objeto stats que espera el template
-        stats = {
-            'total_vacantes': total_vacantes,
-            'total_estudiantes': total_estudiantes,
-            'total_postulaciones': total_postulaciones,
-            'fuentes': fuentes,
-        }
+        # Últimas 5 postulaciones
+        r_post_rec = (
+            sb.table('postulaciones')
+            .select('id, estado, creado_en, vacantes(titulo, empresa), usuarios(nombre, apellido, email)')
+            .order('creado_en', desc=True)
+            .limit(5)
+            .execute()
+        )
 
-        # Vacantes recientes (últimas 5)
-        recientes_resp = (
+        # Últimas 5 vacantes
+        r_vac_rec = (
             sb.table('vacantes')
             .select('id, titulo, empresa, fuente, modalidad, activa, creado_en')
             .order('creado_en', desc=True)
             .limit(5)
             .execute()
         )
-        vacantes_recientes = recientes_resp.data or []
 
-        # Postulaciones recientes (últimas 5)
-        postulaciones_recientes_resp = (
-            sb.table('postulaciones')
-            .select('id, estado, creado_en, vacantes(titulo, empresa), usuarios(nombre, apellido)')
-            .order('creado_en', desc=True)
-            .limit(5)
-            .execute()
-        )
-        postulaciones_recientes = postulaciones_recientes_resp.data or []
-
-        return render_template(
-            'coordinador/dashboard.html',
-            stats=stats,
-            vacantes_recientes=vacantes_recientes,
-            postulaciones_recientes=postulaciones_recientes,
-        )
+        return jsonify({
+            'ok': True,
+            'stats': {
+                'total_vacantes':      r_vacantes.count     or 0,
+                'total_estudiantes':   r_estudiantes.count  or 0,
+                'total_postulaciones': r_postulaciones.count or 0,
+                'fuentes':             fuentes,
+            },
+            'postulaciones_recientes': r_post_rec.data or [],
+            'vacantes_recientes':      r_vac_rec.data  or [],
+        }), 200
 
     except Exception as e:
-        flash(f'Error al cargar el dashboard: {str(e)}', 'danger')
-        return render_template(
-            'coordinador/dashboard.html',
-            stats={'total_vacantes': 0, 'total_estudiantes': 0, 'total_postulaciones': 0, 'fuentes': {}},
-            vacantes_recientes=[],
-            postulaciones_recientes=[],
-        )
+        return jsonify({'error': str(e)}), 500
 
 
-# ── VER POSTULACIONES ─────────────────────────────────────────
-@coordinador_bp.route('/postulaciones')
-@coordinador_required
+# ── CHART DATA ────────────────────────────────────────────────
+@coordinador_bp.route('/chart-data', methods=['GET'])
+@coordinador_required_json
+def chart_data():
+    """
+    GET /api/coordinador/chart-data
+    Serie temporal de vacantes por mes (últimos 6 meses).
+    """
+    try:
+        sb = get_supabase()
+        from collections import defaultdict
+
+        r = sb.table('vacantes').select('creado_en, fuente').eq('activa', True).execute()
+
+        por_mes = defaultdict(int)
+        for v in (r.data or []):
+            fecha = (v.get('creado_en') or '')[:7]  # YYYY-MM
+            if fecha:
+                por_mes[fecha] += 1
+
+        # Ordenar y tomar últimos 6 meses
+        series = [
+            {'mes': mes, 'total': total}
+            for mes, total in sorted(por_mes.items())
+        ][-6:]
+
+        return jsonify({
+            'ok':    True,
+            'series': series,
+        }), 200
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+# ── TODAS LAS POSTULACIONES ───────────────────────────────────
+@coordinador_bp.route('/postulaciones', methods=['GET'])
+@coordinador_required_json
 def postulaciones():
-    """Lista todas las postulaciones para revisión del coordinador."""
+    """
+    GET /api/coordinador/postulaciones
+    Params opcionales: ?estado=postulado|en_proceso|aceptado|rechazado
+    """
     try:
-        sb = get_supabase()
-        resp = (
+        sb     = get_supabase()
+        estado = request.args.get('estado', '')
+
+        query = (
             sb.table('postulaciones')
-            .select('id, estado, creado_en, vacantes(titulo, empresa), usuarios(nombre, apellido, email)')
+            .select('*, usuarios(nombre, apellido, email, programa), vacantes(titulo, empresa)')
             .order('creado_en', desc=True)
-            .execute()
         )
-        return render_template(
-            'coordinador/postulaciones.html',
-            postulaciones=resp.data or []
-        )
+
+        if estado:
+            query = query.eq('estado', estado)
+
+        r = query.execute()
+
+        return jsonify({
+            'ok':            True,
+            'postulaciones': r.data or [],
+        }), 200
+
     except Exception as e:
-        flash(f'Error al cargar postulaciones: {str(e)}', 'danger')
-        return render_template('coordinador/postulaciones.html', postulaciones=[])
+        return jsonify({'error': str(e)}), 500
 
 
-# ── EJECUTAR SCRAPER ──────────────────────────────────────────
-@coordinador_bp.route('/ejecutar-scraper', methods=['GET', 'POST'])
-@coordinador_required
-def ejecutar_scraper():
-    if request.method == 'POST':
-        try:
-            from app.scrapers.computrabajo import ComputrabajoScraper
+# ── CAMBIAR ESTADO DE POSTULACIÓN ─────────────────────────────
+@coordinador_bp.route('/postulaciones/<postulacion_id>/estado', methods=['POST', 'OPTIONS'])
+@coordinador_required_json
+def cambiar_estado(postulacion_id):
+    """POST /api/coordinador/postulaciones/<id>/estado"""
+    if request.method == 'OPTIONS':
+        return jsonify({}), 200
 
-            # Reusar el cliente de servicio ya inicializado al arrancar la app
-            # (bypasea RLS igual que el script de terminal)
-            sb_service = get_supabase_service()
+    data         = request.get_json(silent=True) or {}
+    nuevo_estado = data.get('estado')
+    nota         = data.get('nota', '')
 
-            if sb_service is None:
-                flash('❌ SUPABASE_SERVICE_KEY no está configurada en el .env', 'danger')
-                return redirect(url_for('coordinador.ejecutar_scraper'))
+    estados_validos = ['postulado', 'en_proceso', 'aceptado', 'rechazado']
+    if nuevo_estado not in estados_validos:
+        return jsonify({'error': f'Estado inválido. Opciones: {estados_validos}'}), 400
 
-            terminos = [
-                'pasantia ingenieria',
-                'practicante sistemas',
-                'aprendiz sena',
-                'practicante administrativo',
-                'trainee colombia',
-                'practicante ambiental',
-                'auxiliar juridico sin experiencia',
-                'desarrollador junior sin experiencia',
-            ]
-
-            scraper = ComputrabajoScraper(
-                supabase_client=sb_service,
-                delay_min=4,
-                delay_max=8
-            )
-
-            resumen = scraper.ejecutar(
-                terminos_busqueda=terminos,
-                max_paginas=2
-            )
-
-            flash(
-                f"🤖 Scraper completado: {resumen['vacantes_guardadas']} vacantes nuevas "
-                f"guardadas de {resumen['vacantes_encontradas']} encontradas. "
-                f"({resumen['vacantes_rechazadas']} rechazadas por filtros)",
-                'success'
-            )
-
-        except Exception as e:
-            flash(f'❌ Error ejecutando scraper: {str(e)}', 'danger')
-
-        return redirect(url_for('coordinador.dashboard'))
-
-    return render_template('coordinador/scraper.html')
-
-
-# ── GESTIÓN DE VACANTES ───────────────────────────────────────
-@coordinador_bp.route('/vacantes')
-@coordinador_required
-def gestionar_vacantes():
-    """Lista todas las vacantes para el coordinador."""
     try:
         sb = get_supabase()
+
+        update_data = {'estado': nuevo_estado}
+        if nota:
+            update_data['nota'] = nota
+
+        sb.table('postulaciones').update(update_data).eq('id', postulacion_id).execute()
+
+        return jsonify({
+            'ok':      True,
+            'mensaje': f'Estado actualizado a "{nuevo_estado}"',
+        }), 200
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+# ── LISTAR VACANTES (vista coordinador) ───────────────────────
+@coordinador_bp.route('/vacantes', methods=['GET'])
+@coordinador_required_json
+def listar_vacantes():
+    """
+    GET /api/coordinador/vacantes
+    Params opcionales: ?mostrar=activas|inactivas|todas
+    """
+    try:
+        sb      = get_supabase()
         mostrar = request.args.get('mostrar', 'activas')
 
         query = sb.table('vacantes').select('*').order('creado_en', desc=True)
@@ -172,76 +204,151 @@ def gestionar_vacantes():
             query = query.eq('activa', True)
         elif mostrar == 'inactivas':
             query = query.eq('activa', False)
+        # 'todas' no aplica filtro
 
-        respuesta = query.execute()
-        vacantes = respuesta.data or []
+        r = query.execute()
 
-        return render_template(
-            'coordinador/vacantes.html',
-            vacantes=vacantes,
-            mostrar=mostrar
-        )
+        return jsonify({
+            'ok':      True,
+            'vacantes': r.data or [],
+        }), 200
 
     except Exception as e:
-        flash(f'Error al cargar vacantes: {str(e)}', 'danger')
-        return render_template('coordinador/vacantes.html', vacantes=[], mostrar='activas')
+        return jsonify({'error': str(e)}), 500
+
+
+# ── CREAR VACANTE MANUAL ──────────────────────────────────────
+@coordinador_bp.route('/vacantes', methods=['POST', 'OPTIONS'])
+@coordinador_required_json
+def crear_vacante():
+    """POST /api/coordinador/vacantes"""
+    if request.method == 'OPTIONS':
+        return jsonify({}), 200
+
+    data = request.get_json(silent=True) or {}
+
+    titulo  = (data.get('titulo')  or '').strip()
+    empresa = (data.get('empresa') or '').strip()
+
+    if not titulo or not empresa:
+        return jsonify({'error': 'Título y empresa son obligatorios'}), 400
+
+    try:
+        # Usar service key para bypasear RLS
+        sb = get_supabase_service() or get_supabase()
+
+        nueva = {
+            'titulo':          titulo,
+            'empresa':         empresa,
+            'salario':         data.get('salario')         or None,
+            'ubicacion':       data.get('ubicacion')       or None,
+            'modalidad':       data.get('modalidad', 'presencial'),
+            'descripcion':     data.get('descripcion')     or None,
+            'requisitos':      data.get('requisitos')      or None,
+            'link_aplicacion': data.get('link_aplicacion') or None,
+            'fecha_limite':    data.get('fecha_limite')    or None,
+            'fuente':          'manual',
+            'activa':          True,
+        }
+
+        resultado = sb.table('vacantes').insert(nueva).execute()
+
+        return jsonify({
+            'ok':      True,
+            'vacante': resultado.data[0] if resultado.data else None,
+            'mensaje': f'Vacante "{titulo}" creada exitosamente',
+        }), 201
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 # ── TOGGLE ACTIVA/INACTIVA ────────────────────────────────────
-@coordinador_bp.route('/vacantes/<uuid:vacante_id>/toggle', methods=['POST'])
-@coordinador_required
+@coordinador_bp.route('/vacantes/<vacante_id>/toggle', methods=['POST', 'OPTIONS'])
+@coordinador_required_json
 def toggle_vacante(vacante_id):
-    """Activa o desactiva una vacante."""
+    """POST /api/coordinador/vacantes/<id>/toggle"""
+    if request.method == 'OPTIONS':
+        return jsonify({}), 200
+
     try:
         sb = get_supabase()
 
-        resp = sb.table('vacantes').select('activa').eq('id', str(vacante_id)).single().execute()
-        if not resp.data:
-            flash('Vacante no encontrada.', 'warning')
-            return redirect(url_for('coordinador.gestionar_vacantes'))
+        r = sb.table('vacantes').select('activa, titulo').eq('id', vacante_id).single().execute()
 
-        nuevo_estado = not resp.data['activa']
-        sb.table('vacantes').update({'activa': nuevo_estado}).eq('id', str(vacante_id)).execute()
+        if not r.data:
+            return jsonify({'error': 'Vacante no encontrada'}), 404
 
-        estado_texto = 'activada' if nuevo_estado else 'desactivada'
-        flash(f'Vacante {estado_texto} correctamente.', 'success')
+        nuevo_estado = not r.data['activa']
+        sb.table('vacantes').update({'activa': nuevo_estado}).eq('id', vacante_id).execute()
+
+        accion = 'activada' if nuevo_estado else 'desactivada'
+
+        return jsonify({
+            'ok':      True,
+            'activa':  nuevo_estado,
+            'mensaje': f'Vacante "{r.data["titulo"]}" {accion}',
+        }), 200
 
     except Exception as e:
-        flash(f'Error al cambiar estado: {str(e)}', 'danger')
-
-    return redirect(url_for('coordinador.gestionar_vacantes'))
+        return jsonify({'error': str(e)}), 500
 
 
-# ── NUEVA VACANTE (formulario) ────────────────────────────────
-@coordinador_bp.route('/vacantes/nueva', methods=['GET', 'POST'])
-@coordinador_required
-def nueva_vacante():
-    """Crea una nueva vacante manualmente."""
-    if request.method == 'POST':
-        try:
-            sb = get_supabase()
+# ── EJECUTAR SCRAPER ──────────────────────────────────────────
+@coordinador_bp.route('/ejecutar-scraper', methods=['POST', 'OPTIONS'])
+@coordinador_required_json
+def ejecutar_scraper():
+    """
+    POST /api/coordinador/ejecutar-scraper
+    Dispara el scraper de Computrabajo manualmente.
+    ⚠️ Puede tardar 2-5 minutos.
+    """
+    if request.method == 'OPTIONS':
+        return jsonify({}), 200
 
-            data = {
-                'titulo':      request.form.get('titulo', '').strip(),
-                'empresa':     request.form.get('empresa', '').strip(),
-                'ubicacion':   request.form.get('ubicacion', '').strip(),
-                'modalidad':   request.form.get('modalidad', 'presencial'),
-                'fuente':      'manual',
-                'descripcion': request.form.get('descripcion', '').strip(),
-                'requisitos':  request.form.get('requisitos', '').strip(),
-                'url_oferta':  request.form.get('url_oferta', '').strip(),
-                'activa':      True,
-            }
+    try:
+        from app.scrapers.computrabajo import ComputrabajoScraper
 
-            if not data['titulo'] or not data['empresa']:
-                flash('El título y la empresa son obligatorios.', 'warning')
-                return render_template('coordinador/nueva_vacante.html', data=data)
+        sb_service = get_supabase_service()
+        if sb_service is None:
+            return jsonify({'error': 'SUPABASE_SERVICE_KEY no configurada'}), 500
 
-            sb.table('vacantes').insert(data).execute()
-            flash('✅ Vacante creada exitosamente.', 'success')
-            return redirect(url_for('coordinador.gestionar_vacantes'))
+        terminos = [
+            'pasantia ingenieria',
+            'practicante sistemas',
+            'aprendiz sena',
+            'practicante administrativo',
+            'trainee colombia',
+            'practicante ambiental',
+            'auxiliar juridico sin experiencia',
+            'desarrollador junior sin experiencia',
+        ]
 
-        except Exception as e:
-            flash(f'Error al crear vacante: {str(e)}', 'danger')
+        scraper = ComputrabajoScraper(
+            supabase_client=sb_service,
+            delay_min=4,
+            delay_max=8
+        )
 
-    return render_template('coordinador/nueva_vacante.html', data={})
+        resumen = scraper.ejecutar(
+            terminos_busqueda=terminos,
+            max_paginas=2
+        )
+
+        return jsonify({
+            'ok':      True,
+            'resumen': {
+                'encontradas':  resumen['vacantes_encontradas'],
+                'guardadas':    resumen['vacantes_guardadas'],
+                'rechazadas':   resumen['vacantes_rechazadas'],
+                'errores':      resumen['errores'],
+                'duracion_seg': resumen['duracion_segundos'],
+            },
+            'mensaje': (
+                f"Scraper completado: {resumen['vacantes_guardadas']} vacantes nuevas "
+                f"de {resumen['vacantes_encontradas']} encontradas."
+            ),
+        }), 200
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500

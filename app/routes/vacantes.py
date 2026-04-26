@@ -1,44 +1,51 @@
 # app/routes/vacantes.py
 # ============================================================
-# RUTAS DE VACANTES — Cartelera principal de SIPE
+# RUTAS DE VACANTES — API JSON pura
+# Endpoints bajo prefijo /api/vacantes/
 # ============================================================
 
-from flask import Blueprint, render_template, jsonify, request, redirect, url_for, flash, session
+from flask import Blueprint, request, jsonify, session
 from app.extensions import get_supabase
-from app.auth_utils import login_required
-from app.config import CARRERAS_KEYWORDS
+from functools import wraps
 
-vacantes_bp = Blueprint('vacantes', __name__)
-# Agregar en vacantes.py, antes de las otras rutas
+vacantes_bp = Blueprint('vacantes_api', __name__)
 
-from flask import Blueprint, render_template, request, redirect, url_for, flash, session, jsonify
-from app.extensions import get_supabase
-from app.auth_utils import login_required
-
-vacantes_bp = Blueprint('vacantes', __name__)
-
-# ── RUTA RAÍZ — Redirige al login o a vacantes ────────────────
-@vacantes_bp.route('/')
-def home():
-    """Ruta principal — redirige según si hay sesión activa."""
-    if 'usuario_id' in session:
-        return redirect(url_for('vacantes.index'))
-    return redirect(url_for('auth.login'))
+# ── Keywords por carrera Unipaz ───────────────────────────────
+# Importar desde computrabajo si existe, sino definir aquí
+try:
+    from app.scrapers.computrabajo import CARRERAS_UNIPAZ as CARRERAS_KEYWORDS
+except ImportError:
+    CARRERAS_KEYWORDS = {}
 
 
-# ── CARTELERA PRINCIPAL ───────────────────────────────────────
-@vacantes_bp.route('/')
-@login_required
+# ── Decorador de autenticación JSON ──────────────────────────
+def login_required_json(f):
+    """Retorna 401 JSON si el usuario no está autenticado."""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if 'usuario_id' not in session:
+            return jsonify({'error': 'No autenticado', 'autenticado': False}), 401
+        return f(*args, **kwargs)
+    return decorated
+
+
+# ── LISTAR VACANTES ───────────────────────────────────────────
+@vacantes_bp.route('/', methods=['GET'])
+@login_required_json
 def index():
+    """
+    GET /api/vacantes/
+    Params opcionales: ?q=texto&modalidad=...&fuente=...&carrera=...
+    """
     try:
         sb = get_supabase()
 
         modalidad = request.args.get('modalidad', '')
         fuente    = request.args.get('fuente', '')
         carrera   = request.args.get('carrera', '')
-        # Sanitizar búsqueda: strip() elimina espacios, or '' evita None
         busqueda  = (request.args.get('q') or '').strip()
 
+        # Construir query base
         query = sb.table('vacantes').select('*').eq('activa', True)
 
         if modalidad:
@@ -46,153 +53,122 @@ def index():
         if fuente:
             query = query.eq('fuente', fuente)
 
-        query = query.order('creado_en', desc=True)
-        respuesta = query.execute()
-        vacantes  = respuesta.data
+        query    = query.order('creado_en', desc=True)
+        response = query.execute()
+        vacantes = response.data or []
 
-        # ── Filtro de búsqueda por texto ──────────────────────
+        # ── Filtro por texto (en Python) ──────────────────────
         if busqueda:
-            busqueda_lower = busqueda.lower()
-            vacantes_filtradas = []
-
-            for v in vacantes:
-                # CORRECCIÓN CRÍTICA: usar 'or """ para evitar None
-                # antes de aplicar .lower()
-                titulo      = (v.get('titulo')      or '').lower()
-                empresa     = (v.get('empresa')     or '').lower()
-                ubicacion   = (v.get('ubicacion')   or '').lower()
-                descripcion = (v.get('descripcion') or '').lower()
-                requisitos  = (v.get('requisitos')  or '').lower()
-
-                if (busqueda_lower in titulo      or
-                    busqueda_lower in empresa     or
-                    busqueda_lower in ubicacion   or
-                    busqueda_lower in descripcion or
-                    busqueda_lower in requisitos):
-                    vacantes_filtradas.append(v)
-
-            vacantes = vacantes_filtradas
+            bl = busqueda.lower()
+            vacantes = [
+                v for v in vacantes
+                if bl in (v.get('titulo')      or '').lower()
+                or bl in (v.get('empresa')     or '').lower()
+                or bl in (v.get('ubicacion')   or '').lower()
+                or bl in (v.get('descripcion') or '').lower()
+                or bl in (v.get('requisitos')  or '').lower()
+            ]
 
         # ── Filtro por carrera Unipaz ─────────────────────────
         if carrera and carrera in CARRERAS_KEYWORDS:
-            keywords = CARRERAS_KEYWORDS[carrera]
-            vacantes_filtradas = []
+            kws = CARRERAS_KEYWORDS[carrera]
+            vacantes = [
+                v for v in vacantes
+                if any(
+                    kw in (
+                        (v.get('titulo')      or '') + ' ' +
+                        (v.get('descripcion') or '') + ' ' +
+                        (v.get('requisitos')  or '')
+                    ).lower()
+                    for kw in kws
+                )
+            ]
 
-            for v in vacantes:
-                titulo      = (v.get('titulo')      or '').lower()
-                empresa     = (v.get('empresa')     or '').lower()
-                descripcion = (v.get('descripcion') or '').lower()
-                requisitos  = (v.get('requisitos')  or '').lower()
-                ubicacion   = (v.get('ubicacion')   or '').lower()
-                texto       = f"{titulo} {empresa} {descripcion} {requisitos} {ubicacion}"
-
-                if any(kw in texto for kw in keywords):
-                    vacantes_filtradas.append(v)
-
-            vacantes = vacantes_filtradas
-
-        # Mensaje amigable si no hay resultados
-        if not vacantes and busqueda:
-            sin_resultados_msg = (
-                f'No se encontraron vacantes para "{busqueda}". '
-                f'Intenta con otros términos.'
-            )
-        else:
-            sin_resultados_msg = None
-
-        return render_template(
-            'vacantes/index.html',
-            vacantes=vacantes,
-            total=len(vacantes),
-            filtro_modalidad=modalidad,
-            filtro_fuente=fuente,
-            filtro_busqueda=busqueda,
-            filtro_carrera=carrera,
-            sin_resultados_msg=sin_resultados_msg,
-            carreras=list(CARRERAS_KEYWORDS.keys())
-        )
+        return jsonify({
+            'ok':       True,
+            'total':    len(vacantes),
+            'vacantes': vacantes,
+            'carreras': list(CARRERAS_KEYWORDS.keys()),
+        }), 200
 
     except Exception as e:
-        flash(f'Error al cargar vacantes: {str(e)}', 'danger')
-        return render_template('vacantes/index.html',
-                               vacantes=[], total=0,
-                               carreras=list(CARRERAS_KEYWORDS.keys()))
+        return jsonify({'error': str(e)}), 500
 
 
 # ── DETALLE DE UNA VACANTE ────────────────────────────────────
-@vacantes_bp.route('/<uuid:vacante_id>')
-@login_required
+@vacantes_bp.route('/<vacante_id>', methods=['GET'])
+@login_required_json
 def detalle(vacante_id):
-    """Muestra el detalle completo de una vacante."""
+    """GET /api/vacantes/<vacante_id>"""
     try:
         sb = get_supabase()
 
         respuesta = (
             sb.table('vacantes')
             .select('*')
-            .eq('id', str(vacante_id))
+            .eq('id', vacante_id)
             .single()
             .execute()
         )
 
         if not respuesta.data:
-            flash('Vacante no encontrada.', 'warning')
-            return redirect(url_for('vacantes.index'))
+            return jsonify({'error': 'Vacante no encontrada'}), 404
 
-        # Verificar si el usuario ya se postuló
+        # Verificar si ya se postuló
         ya_postulado = False
         if session.get('usuario_id'):
             post = (
                 sb.table('postulaciones')
                 .select('id')
                 .eq('usuario_id', session['usuario_id'])
-                .eq('vacante_id', str(vacante_id))
+                .eq('vacante_id', vacante_id)
                 .execute()
             )
             ya_postulado = len(post.data) > 0
 
-        return render_template(
-            'vacantes/detalle.html',
-            vacante=respuesta.data,
-            ya_postulado=ya_postulado
-        )
+        return jsonify({
+            'ok':           True,
+            'vacante':      respuesta.data,
+            'ya_postulado': ya_postulado,
+        }), 200
 
     except Exception as e:
-        flash(f'Error al cargar la vacante: {str(e)}', 'danger')
-        return redirect(url_for('vacantes.index'))
+        return jsonify({'error': str(e)}), 500
 
 
-# ── POSTULARSE A UNA VACANTE ──────────────────────────────────
-@vacantes_bp.route('/<uuid:vacante_id>/postular', methods=['POST'])
-@login_required
+# ── POSTULARSE ────────────────────────────────────────────────
+@vacantes_bp.route('/<vacante_id>/postular', methods=['POST', 'OPTIONS'])
+@login_required_json
 def postular(vacante_id):
-    """Registra la postulación de un estudiante a una vacante."""
+    """POST /api/vacantes/<vacante_id>/postular"""
+    if request.method == 'OPTIONS':
+        return jsonify({}), 200
+
     try:
         sb = get_supabase()
 
-        nueva_postulacion = {
+        sb.table('postulaciones').insert({
             'usuario_id': session['usuario_id'],
-            'vacante_id': str(vacante_id),
-            'estado':     'postulado'
-        }
+            'vacante_id': vacante_id,
+            'estado':     'postulado',
+        }).execute()
 
-        sb.table('postulaciones').insert(nueva_postulacion).execute()
-        flash('¡Te postulaste exitosamente! El coordinador revisará tu solicitud.', 'success')
+        return jsonify({
+            'ok':      True,
+            'mensaje': '¡Te postulaste exitosamente! El coordinador revisará tu solicitud.',
+        }), 201
 
     except Exception as e:
         if 'unique' in str(e).lower():
-            flash('Ya te habías postulado a esta vacante anteriormente.', 'warning')
-        else:
-            flash(f'Error al postularse: {str(e)}', 'danger')
-
-    return redirect(url_for('vacantes.detalle', vacante_id=vacante_id))
+            return jsonify({'error': 'Ya te postulaste a esta vacante anteriormente'}), 409
+        return jsonify({'error': str(e)}), 500
 
 
 # ── MIS POSTULACIONES ─────────────────────────────────────────
-@vacantes_bp.route('/mis-postulaciones')
-@login_required
+@vacantes_bp.route('/mis-postulaciones', methods=['GET'])
+@login_required_json
 def mis_postulaciones():
-    """Muestra las postulaciones del estudiante logueado."""
+    """GET /api/vacantes/mis-postulaciones"""
     try:
         sb = get_supabase()
 
@@ -204,63 +180,25 @@ def mis_postulaciones():
             .execute()
         )
 
-        return render_template(
-            'vacantes/mis_postulaciones.html',
-            postulaciones=respuesta.data
-        )
-
-    except Exception as e:
-        flash(f'Error: {str(e)}', 'danger')
-        return render_template('vacantes/mis_postulaciones.html', postulaciones=[])
-
-
-# ── RUTA DE DIAGNÓSTICO (mantener del paso anterior) ──────────
-@vacantes_bp.route('/test-conexion')
-def test_conexion():
-    try:
-        sb = get_supabase()
-        respuesta = sb.table('vacantes').select('id, titulo, empresa').limit(1).execute()
         return jsonify({
-            'status': 'ok',
-            'mensaje': '✅ Conexión con Supabase funcionando perfectamente',
-            'muestra': respuesta.data
-        })
+            'ok':            True,
+            'postulaciones': respuesta.data or [],
+        }), 200
+
     except Exception as e:
-        return jsonify({'status': 'error', 'mensaje': str(e)}), 500
+        return jsonify({'error': str(e)}), 500
 
-        # Agregar al final de vacantes.py
 
-from app.auth_utils import coordinador_required
-
-@vacantes_bp.route('/ejecutar-scraper', methods=['POST'])
-@coordinador_required
-def ejecutar_scraper():
-    """
-    Ruta para ejecutar el scraper desde el panel del coordinador.
-    Solo accesible para usuarios con rol 'coordinador'.
-    """
+# ── TEST CONEXIÓN ─────────────────────────────────────────────
+@vacantes_bp.route('/test-conexion', methods=['GET'])
+def test_conexion():
+    """GET /api/vacantes/test-conexion — Endpoint público de diagnóstico"""
     try:
-        from app.scrapers.computrabajo import ComputrabajoScraper
-
         sb = get_supabase()
-
-        scraper = ComputrabajoScraper(
-            supabase_client=sb,
-            delay_min=3,
-            delay_max=5
-        )
-
-        resumen = scraper.ejecutar(
-            terminos_busqueda=['ingeniero sistemas', 'desarrollador python', 'soporte tecnico'],
-            max_paginas=2
-        )
-
-        flash(
-            f"✅ Scraper completado: {resumen['vacantes_guardadas']} vacantes nuevas guardadas.",
-            'success'
-        )
-
+        r  = sb.table('vacantes').select('id').limit(1).execute()
+        return jsonify({
+            'ok':      True,
+            'mensaje': 'Conexión con Supabase funcionando correctamente',
+        }), 200
     except Exception as e:
-        flash(f'❌ Error en el scraper: {str(e)}', 'danger')
-
-    return redirect(url_for('vacantes.index'))
+        return jsonify({'ok': False, 'error': str(e)}), 500

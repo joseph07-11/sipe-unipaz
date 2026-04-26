@@ -93,6 +93,18 @@ PALABRAS_SENIOR = [
     'coordinador senior', 'consultor senior', '5+ años', '5 o más años',
     'experto con', 'especialista con experiencia',
 ]
+TERMINOS_BUSQUEDA = [
+    'pasantia ingenieria',
+    'practicante sistemas',
+    'aprendiz sena',
+    'practicante administrativo',
+    'trainee colombia',
+    'practicante ambiental',
+    'auxiliar juridico sin experiencia',
+    'desarrollador junior sin experiencia',
+    'practicante veterinaria',
+    'practicante agroindustrial',
+]
 
 
 # ══════════════════════════════════════════════════════════════

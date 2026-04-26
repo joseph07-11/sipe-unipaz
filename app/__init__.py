@@ -65,13 +65,14 @@ def create_app(config_name='default'):
     # Agregar esto ANTES del return app en create_app()
 
     # ── Ruta raíz ────────────────────────────────────────────────
+    # En create_app(), reemplaza el home() anterior por este:
+
     from flask import redirect, url_for, session
-    
+
     @app.route('/')
     def home():
-        """Redirige al login o a vacantes según si hay sesión."""
-        if 'usuario_id' in session:
-            return redirect(url_for('vacantes.index'))
+    # En producción las cookies de sesión pueden no estar
+    # disponibles en la primera petición — redirigir directo al login
         return redirect(url_for('auth.login'))
 
     return app

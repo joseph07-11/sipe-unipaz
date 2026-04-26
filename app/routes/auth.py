@@ -77,11 +77,9 @@ def registro():
 # ── LOGIN ─────────────────────────────────────────────────────
 @auth_bp.route('/login', methods=['GET', 'POST'])
 def login():
-    """Muestra el form de login (GET) y procesa el login (POST)."""
-
-    # Si ya está logueado, redirigir al inicio
+    # ── CORRECCIÓN: verificar sesión sin redirigir a /
     if 'usuario_id' in session:
-        return redirect(url_for('vacantes.index'))
+        return redirect(url_for('vacantes.index'))  # ← directo a vacantes
 
     if request.method == 'POST':
         email    = request.form.get('email', '').strip().lower()
@@ -89,7 +87,11 @@ def login():
 
         if not email or not password:
             flash('Ingresa tu correo y contraseña.', 'danger')
-            return render_template('auth/login.html')
+            return redirect(url_for('vacantes.index'))  # ← no a home()
+
+
+        return render_template('auth/login.html')
+            
 
         try:
             sb = get_supabase()

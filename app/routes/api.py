@@ -3,10 +3,14 @@
 # API REST — Endpoints JSON para el Frontend React
 # ============================================================
 
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
 from flask import Blueprint, jsonify, request, session
 from app.extensions import get_supabase, get_supabase_service
 from app.auth_utils import hash_password, verify_password
 from app.config import CARRERAS_KEYWORDS
+from app.scrapers.indeed import IndeedScraper
+from app.scrapers.elempleo import ElempleoScraper
 
 api_bp = Blueprint('api', __name__)
 
@@ -612,6 +616,99 @@ def api_coordinador_ejecutar_scraper():
 
     except Exception as e:
         return jsonify({'error': f'Error en el scraper: {str(e)}'}), 500
+
+
+# ── HELPER PRIVADO ────────────────────────────────────────────
+
+def _ejecutar_scraper_generico(scraper_cls, terminos, max_paginas=2):
+    """
+    Instancia un scraper, lo ejecuta y retorna el resumen.
+    Usa el cliente service_role (bypass RLS) igual que el scraper de Computrabajo.
+    """
+    try:
+        sb = get_supabase_service()
+        scraper = scraper_cls(supabase_client=sb)
+        resumen = scraper.ejecutar(
+            terminos_busqueda=terminos,
+            max_paginas=max_paginas,
+        )
+        return {**resumen, 'ok': True}
+    except Exception as e:
+        return {
+            'ok': False,
+            'fuente': scraper_cls.__name__,
+            'error': str(e),
+        }
+
+
+# ┌─────────────────────────────────────────────────────────────┐
+# │  POST /api/coordinador/ejecutar-scraper-indeed              │
+# └─────────────────────────────────────────────────────────────┘
+@api_bp.route('/coordinador/ejecutar-scraper-indeed', methods=['POST'])
+def ejecutar_scraper_indeed():
+    """Lanza el scraper de Indeed Colombia."""
+    check = _check_coordinador()
+    if check:
+        return check
+
+    from app.scrapers.computrabajo import TERMINOS_BUSQUEDA
+
+    resultado = _ejecutar_scraper_generico(IndeedScraper, TERMINOS_BUSQUEDA)
+    status = 200 if resultado.get('ok') else 500
+    return jsonify(resultado), status
+
+
+# ┌─────────────────────────────────────────────────────────────┐
+# │  POST /api/coordinador/ejecutar-scraper-elempleo            │
+# └─────────────────────────────────────────────────────────────┘
+@api_bp.route('/coordinador/ejecutar-scraper-elempleo', methods=['POST'])
+def ejecutar_scraper_elempleo():
+    """Lanza el scraper de elempleo.com."""
+    check = _check_coordinador()
+    if check:
+        return check
+
+    from app.scrapers.computrabajo import TERMINOS_BUSQUEDA
+
+    resultado = _ejecutar_scraper_generico(ElempleoScraper, TERMINOS_BUSQUEDA)
+    status = 200 if resultado.get('ok') else 500
+    return jsonify(resultado), status
+
+
+# ┌─────────────────────────────────────────────────────────────┐
+# │  POST /api/coordinador/ejecutar-todos-scrapers              │
+# │  Corre Computrabajo + Indeed + Elempleo en paralelo.        │
+# └─────────────────────────────────────────────────────────────┘
+@api_bp.route('/coordinador/ejecutar-todos-scrapers', methods=['POST'])
+def ejecutar_todos_scrapers():
+    """Lanza los 3 scrapers en paralelo y devuelve resumen consolidado."""
+    check = _check_coordinador()
+    if check:
+        return check
+
+    from app.scrapers.computrabajo import ComputrabajoScraper, TERMINOS_BUSQUEDA
+
+    scrapers = [ComputrabajoScraper, IndeedScraper, ElempleoScraper]
+
+    resultados = []
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        futuros = {
+            pool.submit(_ejecutar_scraper_generico, cls, TERMINOS_BUSQUEDA): cls
+            for cls in scrapers
+        }
+        for fut in as_completed(futuros):
+            resultados.append(fut.result())
+
+    total_guardadas = sum(
+        r.get('vacantes_guardadas', 0) for r in resultados if r.get('ok')
+    )
+    todos_ok = all(r.get('ok') for r in resultados)
+
+    return jsonify({
+        'ok': todos_ok,
+        'total_vacantes_guardadas': total_guardadas,
+        'resultados_por_fuente': resultados,
+    }), 200 if todos_ok else 207  # 207 Multi-Status si alguno falló
 
 
 # ════════════════════════════════════════════════════════════════

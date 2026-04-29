@@ -113,7 +113,28 @@ def api_registro():
         if existe.data:
             return jsonify({'error': 'Ya existe una cuenta con ese correo electrónico.'}), 409
 
+        # PASO 1: Registrar en Supabase Auth (esto dispara el correo)
+        auth_response = sb.auth.sign_up({
+            "email": email,
+            "password": password,
+            "options": {
+                "data": {
+                    "nombre": nombre,
+                    "apellido": apellido,
+                    "codigo": codigo,
+                    "programa": programa
+                }
+            }
+        })
+
+        if not auth_response.user:
+            return jsonify({'error': 'Error al crear la cuenta de autenticación.'}), 400
+
+        user_id = auth_response.user.id  # UUID de Auth
+
+        # PASO 2: Guardar perfil extendido en public.usuarios
         nuevo_usuario = {
+            'id':            user_id,
             'nombre':        nombre,
             'apellido':      apellido,
             'email':         email,
@@ -128,10 +149,10 @@ def api_registro():
         if resultado.data:
             return jsonify({
                 'ok': True,
-                'mensaje': 'Cuenta creada exitosamente. Ya puedes iniciar sesión.'
+                'mensaje': 'Registro exitoso. Revisa tu correo para confirmar tu cuenta.'
             }), 201
         else:
-            return jsonify({'error': 'Error al crear la cuenta.'}), 500
+            return jsonify({'error': 'Error al crear el perfil de la cuenta.'}), 500
 
     except Exception as e:
         return jsonify({'error': f'Error del servidor: {str(e)}'}), 500
